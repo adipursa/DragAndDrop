@@ -3,11 +3,19 @@
  * 디렉토리 관리 통합 모듈 - 04 디렉토리 조작 함수
  * 
  * 이 파일은 디렉토리 추가, 삭제, 이동 등의 조작 함수를 포함합니다.
+ * 
+ * 스프링 부트 MVC 연결:
+ * - 디렉토리 추가 함수: DirectoryController.createDirectory() POST API 엔드포인트를 호출합니다.
+ * - 디렉토리 삭제 함수: DirectoryController.deleteDirectory() DELETE API 엔드포인트를 호출합니다.
+ * - 디렉토리 이동 함수: DirectoryController.moveDirectory() 또는 moveDirectoryPut() API를 호출합니다.
+ * - 모든 API 호출은 com.dropand.dto 패키지의 DTO 객체들을 JSON으로 주고받습니다.
  */
 
 // 디렉토리 조작 함수를 DirectoryManager 객체에 추가
 (function() {
     // 새 디렉토리 추가
+    // 실제 구현에서는 DirectoryController.createDirectory() API를 호출해야 함
+    // CreateDirectoryRequest DTO 객체를 생성해서 서버로 전송
     function addNewDirectory() {
         // 필요한 값 가져오기
         const parentId = document.getElementById('parentDirectoryId').value;
@@ -81,6 +89,8 @@
     }
 
     // 새 루트 디렉토리 추가
+    // 실제 구현에서는 DirectoryController.createDirectory() API를 호출해야 함
+    // parentId를 null로 설정한 CreateDirectoryRequest DTO를 서버로 전송
     function addNewRootDirectory() {
         // 필요한 값 가져오기
         const newDirName = document.getElementById('newRootDirectoryName').value.trim();
@@ -133,6 +143,8 @@
     }
 
     // 디렉토리 삭제
+    // 실제 구현에서는 DirectoryController.deleteDirectory() API를 호출해야 함
+    // @DeleteMapping("/{id}") 엔드포인트를 호출하여 서버에서 삭제 처리
     function deleteDirectory(directoryId) {
         const directoryData = DirectoryManager.getData();
         if (!directoryId || !directoryData[directoryId]) {
@@ -196,6 +208,8 @@
     }
 
     // 디렉토리 이동 함수
+    // 실제 구현에서는 DirectoryController.moveDirectory() 또는 moveDirectoryPut() API를 호출해야 함
+    // MoveDirectoryRequest 또는 DirectoryOrderDto DTO 객체를 서버로 전송
     function moveDirectory(directoryId, newParentId) {
         console.log(`디렉토리 이동: ID ${directoryId}를 부모 ID ${newParentId}로 이동`);
         
@@ -326,6 +340,7 @@
     }
 
     // 트리 렌더링 함수 (재귀적)
+    // 서버에서 가져온 Directory 계층 구조를 HTML로 변환
     function renderTree(nodes, parent, parentId) {
         nodes.forEach(node => {
             // 노드 요소 생성
@@ -384,6 +399,7 @@
     }
 
     // 드래그 앤 드롭 기능 설정
+    // 이 기능은 DirectoryController.moveDirectory() API와 연결되어 서버에서도 이동 처리를 해야 함
     function setupDragAndDrop() {
         console.log("드래그 앤 드롭 기능 설정");
         
@@ -505,6 +521,7 @@
     }
 
     // 디렉토리와 하위 디렉토리 재귀적 삭제
+    // DirectoryService.deleteDirectory() 메소드의 클라이언트 측 구현
     function deleteRecursive(directoryId) {
         const directory = DirectoryManager.getData()[directoryId];
         if (!directory) return;

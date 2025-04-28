@@ -3,6 +3,11 @@
  * 디렉토리 관리 통합 모듈 - 01 코어 기능
  * 
  * 이 파일은 기본 변수 정의와 핵심 데이터 관리 함수를 포함합니다.
+ * 
+ * 스프링 부트 MVC 연결:
+ * - 이 파일의 코드는 주로 com.dropand.domain.Directory 엔티티와 데이터를 주고받습니다.
+ * - DirectoryController의 REST API 엔드포인트에서 디렉토리 데이터를 가져와 처리합니다.
+ * - DirectoryDto 객체 형태로 서버에서 전달되는 JSON 데이터를 클라이언트 측에서 관리합니다.
  */
 
 // 전역 DirectoryManager 객체 정의
@@ -10,12 +15,12 @@ var DirectoryManager = (function() {
     //=================================================================
     // 비공개 변수 - 데이터 관리
     //=================================================================
-    var directoryData = {};          // ID로 디렉토리 데이터를 빠르게 조회하기 위한 객체
-    var directoryIdMap = new Map();  // 디렉토리 ID 관리를 위한 Map
-    var directoryPathMap = new Map(); // 경로별 디렉토리 ID 관리를 위한 Map
+    var directoryData = {};          // ID로 디렉토리 데이터를 빠르게 조회하기 위한 객체 (서버의 Directory 엔티티에 해당)
+    var directoryIdMap = new Map();  // 디렉토리 ID 관리를 위한 Map (DirectoryDto의 id 필드와 연결)
+    var directoryPathMap = new Map(); // 경로별 디렉토리 ID 관리를 위한 Map (Directory 엔티티의 path 필드와 연결)
     var currentPath = [];            // 현재 경로를 저장하는 배열 (디렉토리 이동용)
     var expandedState = {};          // 노드 확장 상태 저장
-    var currentParentId = null;      // 현재 부모 디렉토리 ID
+    var currentParentId = null;      // 현재 부모 디렉토리 ID (Directory 엔티티의 parent_id 필드와 연결)
 
     //=================================================================
     // 데이터 관리 함수
@@ -40,15 +45,16 @@ var DirectoryManager = (function() {
     }
 
     // 디렉토리 데이터 처리 및 맵 구성
+    // DirectoryController.getDirectoryTree()의 결과를 처리하는 함수
     function processDirectoryData(data, parentPath = [], parentId = null) {
         data.forEach(item => {
             // 현재 항목의 경로 계산
             const currentPath = [...parentPath, { id: item.id, name: item.name }];
             
-            // 부모 ID 설정
+            // 부모 ID 설정 (Directory 엔티티의 parent_id 필드와 매핑)
             item.parentId = parentId;
             
-            // 경로 정보 추가
+            // 경로 정보 추가 (Directory 엔티티의 path 필드와 유사)
             item.path = currentPath;
             
             // 전역 데이터에 추가
@@ -64,7 +70,7 @@ var DirectoryManager = (function() {
         });
     }
 
-    // ID로 디렉토리 조회
+    // ID로 디렉토리 조회 (DirectoryRepository.findById() 메소드와 유사)
     function getDirectoryById(id) {
         return directoryIdMap.get(id) || null;
     }
@@ -74,7 +80,7 @@ var DirectoryManager = (function() {
         return directoryPathMap.get(pathString) || null;
     }
 
-    // 디렉토리 맵 업데이트
+    // 디렉토리 맵 업데이트 (Directory 엔티티 변경 후 캐시 업데이트)
     function updateDirectoryMaps(directory) {
         // ID 맵 업데이트
         directoryIdMap.set(directory.id, directory);
@@ -94,6 +100,7 @@ var DirectoryManager = (function() {
     }
 
     // 상위-하위 관계 체크 (개선된 버전)
+    // DirectoryService에서 상위-하위 관계를 확인하는 로직과 유사
     function isAncestor(ancestorId, descendantId) {
         console.log(`상위-하위 관계 체크: 상위 ID ${ancestorId}, 하위 ID ${descendantId}`);
     
@@ -129,7 +136,8 @@ var DirectoryManager = (function() {
         return false;
     }
 
-    // 샘플 데이터 로드
+    // 샘플 데이터 로드 (실제로는 API에서 데이터를 가져옴)
+    // DirectoryController.getDirectoryTree() API 엔드포인트 호출 대신 사용
     function loadSampleData() {
         var sampleData = [
             {
