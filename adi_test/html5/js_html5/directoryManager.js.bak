@@ -1,0 +1,1258 @@
+/*
+ * directoryManager.js
+ * 디렉토리 관리 통합 모듈
+ * 
+ * 이 모듈은 이전에 분리되어 있던 디렉토리 ID 관리와 화면 이벤트 관리를
+ * 통합하여 일관성을 유지하고 중복 디렉토리 구조 문제를 해결합니다.
+ */
+
+var DirectoryManager = (function() {
+    //=================================================================
+    // 비공개 변수 - 데이터 관리
+    //=================================================================
+    var directoryData = {};          // ID로 디렉토리 데이터를 빠르게 조회하기 위한 객체
+    var directoryIdMap = new Map();  // 디렉토리 ID 관리를 위한 Map
+    var directoryPathMap = new Map(); // 경로별 디렉토리 ID 관리를 위한 Map
+    var currentPath = [];            // 현재 경로를 저장하는 배열 (디렉토리 이동용)
+    var expandedState = {};          // 노드 확장 상태 저장
+    var currentParentId = null;      // 현재 부모 디렉토리 ID
+
+    //=================================================================
+    // 데이터 관리 함수
+    //=================================================================
+    
+    // 디렉토리 맵 초기화
+    function initializeDirectoryMaps() {
+        directoryIdMap.clear();
+        directoryPathMap.clear();
+        directoryData = {};
+        expandedState = {};
+        currentPath = [];
+        currentParentId = null;
+        console.log("디렉토리 맵 초기화됨");
+    }
+
+    // 디렉토리 데이터 처리 및 맵 구성
+    function processDirectoryData(data, parentPath = [], parentId = null) {
+        data.forEach(item => {
+            // 현재 항목의 경로 계산
+            const currentPath = [...parentPath, { id: item.id, name: item.name }];
+            
+            // 부모 ID 설정
+            item.parentId = parentId;
+            
+            // 경로 정보 추가
+            item.path = currentPath;
+            
+            // 전역 데이터에 추가
+            directoryData[item.id] = item;
+            
+            // 맵에 추가
+            updateDirectoryMaps(item);
+            
+            // 자식 항목도 재귀적으로 처리
+            if (item.children && item.children.length > 0) {
+                processDirectoryData(item.children, currentPath, item.id);
+            }
+        });
+    }
+
+    // ID로 디렉토리 조회
+    function getDirectoryById(id) {
+        return directoryIdMap.get(id) || null;
+    }
+
+    // 경로 문자열로 디렉토리 ID 조회
+    function getDirectoryIdByPath(pathString) {
+        return directoryPathMap.get(pathString) || null;
+    }
+
+    // 디렉토리 맵 업데이트
+    function updateDirectoryMaps(directory) {
+        // ID 맵 업데이트
+        directoryIdMap.set(directory.id, directory);
+        
+        // 경로 맵 업데이트 (경로 문자열로 변환)
+        if (directory.path) {
+            const pathString = directory.path.map(p => p.name).join('/');
+            directoryPathMap.set(pathString, directory.id);
+        }
+        
+        console.log(`디렉토리 맵 업데이트됨 - ID: ${directory.id}`);
+    }
+
+    // 디렉토리 ID 체크 및 유효성 검증
+    function isValidDirectoryId(id) {
+        return directoryIdMap.has(id) || directoryData[id] !== undefined;
+    }
+
+    // 상위-하위 관계 체크 (개선된 버전)
+    function isAncestor(ancestorId, descendantId) {
+        console.log(`상위-하위 관계 체크: 상위 ID ${ancestorId}, 하위 ID ${descendantId}`);
+    
+        // 맵을 사용해 조회
+        const descendant = getDirectoryById(descendantId);
+        if (!descendant) {
+            console.log(`하위 디렉토리 (ID: ${descendantId})를 찾을 수 없습니다.`);
+            return false;
+        }
+        
+        // 경로 정보를 활용해 체크
+        if (descendant.path) {
+            const isAncestorInPath = descendant.path.some(node => node.id === ancestorId);
+            console.log(`경로 정보를 통한 확인 결과: ${isAncestorInPath ? '상위 디렉토리임' : '상위 디렉토리 아님'}`);
+            return isAncestorInPath;
+        }
+        
+        // 기존 방식 (fallback)
+        let currentDir = descendant;
+        let safetyCounter = 0; // 무한 루프 방지
+        const MAX_DEPTH = 100;
+        
+        while (currentDir && currentDir.parentId && safetyCounter < MAX_DEPTH) {
+            if (currentDir.parentId === ancestorId) {
+                console.log(`부모 ID 추적을 통한 확인 결과: 상위 디렉토리임`);
+                return true;
+            }
+            currentDir = getDirectoryById(currentDir.parentId);
+            safetyCounter++;
+        }
+        
+        console.log(`부모 ID 추적을 통한 확인 결과: 상위 디렉토리 아님 (${safetyCounter}번 체크)`);
+        return false;
+    }
+
+    // 샘플 데이터 로드
+    function loadSampleData() {
+        var sampleData = [
+            {
+                id: "1",
+                name: "루트 디렉토리 1",
+                children: [
+                    {
+                        id: "2",
+                        name: "하위 디렉토리 1-1",
+                        children: []
+                    },
+                    {
+                        id: "3",
+                        name: "하위 디렉토리 1-2",
+                        children: []
+                    }
+                ]
+            },
+            {
+                id: "4",
+                name: "루트 디렉토리 2",
+                children: []
+            }
+        ];
+        
+        initializeDirectoryMaps();
+        processDirectoryData(sampleData);
+        
+        return sampleData;
+    }
+
+    // 맵 데이터 상태 출력 및 확인 함수 (디버깅용)
+    function debugMaps() {
+        console.log("======= 디렉토리 맵 디버그 정보 =======");
+        console.log(`directoryData 크기: ${Object.keys(directoryData).length}개 항목`);
+        console.log(`directoryIdMap 크기: ${directoryIdMap.size}개 항목`);
+        console.log(`directoryPathMap 크기: ${directoryPathMap.size}개 항목`);
+        
+        console.log("\n## directoryIdMap 내용:");
+        directoryIdMap.forEach((value, key) => {
+            console.log(`  - ID: ${key}, 이름: ${value.name}, 부모: ${value.parentId || 'root'}`);
+        });
+        
+        console.log("\n## directoryPathMap 내용:");
+        directoryPathMap.forEach((value, key) => {
+            console.log(`  - 경로: ${key}, 연결 ID: ${value}`);
+        });
+        
+        console.log("\n## 상위-하위 구조 분석:");
+        // 각 디렉토리의 하위 항목 수 계산
+        const childCountMap = new Map();
+        directoryIdMap.forEach((dir) => {
+            const parentId = dir.parentId;
+            if (parentId) {
+                childCountMap.set(parentId, (childCountMap.get(parentId) || 0) + 1);
+            }
+        });
+        
+        // 결과 출력
+        childCountMap.forEach((count, parentId) => {
+            const parentDir = directoryIdMap.get(parentId);
+            if (parentDir) {
+                console.log(`  - '${parentDir.name}' (ID: ${parentId})의 하위 항목 수: ${count}개`);
+            } else {
+                console.log(`  - 알 수 없는 부모 ID ${parentId}의 하위 항목 수: ${count}개`);
+            }
+        });
+        
+        console.log("======================================");
+        return true;
+    }
+
+    //=================================================================
+    // 이벤트 관리 함수
+    //=================================================================
+    
+    // 트리 요소에 이벤트 리스너 등록
+    function setupTreeEventListeners() {
+        console.log("트리 이벤트 리스너 설정을 시작합니다.");
+        
+        // 토글 아이콘 클릭 이벤트
+        const toggleIcons = document.querySelectorAll('.tree-node .icon.fa-chevron-right, .tree-node .icon.fa-chevron-down');
+        console.log(`토글 아이콘 ${toggleIcons.length}개를 찾았습니다.`);
+        
+        toggleIcons.forEach(icon => {
+            icon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const nodeId = this.parentNode.dataset.id;
+                console.log(`토글 아이콘 클릭됨: 노드 ID ${nodeId}`);
+                DirectoryManager.toggleNode(nodeId);
+            });
+        });
+        
+        // 트리 노드에 이벤트 리스너 설정
+        const treeNodes = document.querySelectorAll('.tree-node');
+        console.log(`트리 노드 ${treeNodes.length}개를 찾았습니다.`);
+        
+        treeNodes.forEach(nodeElement => {
+            setupNodeEventListeners(nodeElement);
+        });
+    }
+
+    // 노드 요소에 이벤트 리스너 등록
+    function setupNodeEventListeners(nodeElement) {
+        console.log(`노드 ${nodeElement.dataset.id}에 이벤트 리스너를 설정합니다.`);
+        
+        // 하위 디렉토리 추가 버튼 클릭 이벤트
+        const addButton = nodeElement.querySelector('.add-dir-btn');
+        if (addButton) {
+            addButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const nodeId = nodeElement.dataset.id;
+                const nodeName = nodeElement.dataset.name || nodeElement.textContent.trim().replace('[삭제]', '');
+                console.log(`하위 디렉토리 추가 버튼 클릭됨: 부모 ID ${nodeId}`);
+                DirectoryManager.showAddModal(nodeId, nodeName);
+            });
+        }
+        
+        // 삭제 버튼 클릭 이벤트
+        const deleteButton = nodeElement.querySelector('.delete-btn');
+        if (deleteButton) {
+            deleteButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const nodeId = nodeElement.dataset.id;
+                console.log(`삭제 버튼 클릭됨: 노드 ID ${nodeId}`);
+                DirectoryManager.deleteDirectory(nodeId);
+            });
+        }
+        
+        // 노드 클릭 시 토글 기능 추가
+        nodeElement.addEventListener('click', function(e) {
+            if (e.target === this || (e.target.classList.contains('icon') && !e.target.classList.contains('fa-plus'))) {
+                const nodeId = this.dataset.id;
+                if (this.querySelector('.tree-children')) {
+                    console.log(`노드 클릭됨 (토글): 노드 ID ${nodeId}`);
+                    DirectoryManager.toggleNode(nodeId);
+                }
+            }
+        });
+        
+        // 더블클릭 이벤트 (디렉토리 이동)
+        nodeElement.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const nodeId = this.dataset.id;
+            DirectoryManager.handleDirectoryDoubleClick(nodeId);
+        });
+        
+        // 드래그 및 드롭 속성 설정 (드래그 가능)
+        nodeElement.setAttribute('draggable', 'true');
+    }
+
+    // 버튼 이벤트 설정
+    function setupButtonEvents() {
+        console.log("버튼 이벤트 설정");
+        
+        // 루트 디렉토리 추가 버튼
+        const addRootButton = document.getElementById('addRootBtn');
+        if (addRootButton) {
+            addRootButton.addEventListener('click', function() {
+                console.log("루트 디렉토리 추가 버튼 클릭됨");
+                DirectoryManager.showAddRootModal();
+            });
+        }
+        
+        // 상위 디렉토리로 이동 버튼
+        const upButton = document.getElementById('upDirBtn');
+        if (upButton) {
+            upButton.addEventListener('click', function() {
+                console.log("상위 디렉토리로 이동 버튼 클릭됨");
+                DirectoryManager.navigateUp();
+            });
+        }
+        
+        // 모달 닫기 버튼
+        const closeButtons = document.querySelectorAll('.modal .close, .modal .cancel-btn');
+        closeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const modalId = this.closest('.modal').id;
+                console.log(`모달 닫기 버튼 클릭됨: ${modalId}`);
+                DirectoryManager.closeModal(modalId);
+            });
+        });
+        
+        // 새 디렉토리 추가 확인 버튼
+        const addDirectoryConfirmButton = document.getElementById('addDirectoryConfirmBtn');
+        if (addDirectoryConfirmButton) {
+            addDirectoryConfirmButton.addEventListener('click', function() {
+                console.log("디렉토리 추가 확인 버튼 클릭됨");
+                DirectoryManager.addNewDirectory();
+            });
+        }
+        
+        // 새 루트 디렉토리 추가 확인 버튼
+        const addRootDirectoryConfirmButton = document.getElementById('addRootDirectoryConfirmBtn');
+        if (addRootDirectoryConfirmButton) {
+            addRootDirectoryConfirmButton.addEventListener('click', function() {
+                console.log("루트 디렉토리 추가 확인 버튼 클릭됨");
+                DirectoryManager.addNewRootDirectory();
+            });
+        }
+        
+        // 디버그 버튼 (맵 상태 확인)
+        const debugMapBtn = document.getElementById('debugMapBtn');
+        if (debugMapBtn) {
+            debugMapBtn.addEventListener('click', function() {
+                console.log("디버그 버튼 클릭됨: 맵 상태 확인");
+                DirectoryManager.showMapStatus();
+            });
+        }
+        
+        // 리셋 버튼 (맵 초기화 및 새로고침)
+        const resetMapBtn = document.getElementById('resetMapBtn');
+        if (resetMapBtn) {
+            resetMapBtn.addEventListener('click', function() {
+                console.log("리셋 버튼 클릭됨: 맵 초기화 및 새로고침");
+                DirectoryManager.resetAndRefresh();
+            });
+        }
+    }
+
+    // 키보드 이벤트 설정
+    function setupKeyboardEvents() {
+        document.addEventListener('keydown', function(e) {
+            // ESC 키 - 모달 닫기
+            if (e.key === 'Escape') {
+                const visibleModal = document.querySelector('.modal[style*="display: block"]');
+                if (visibleModal) {
+                    console.log(`ESC 키 입력: ${visibleModal.id} 모달 닫기`);
+                    DirectoryManager.closeModal(visibleModal.id);
+                }
+            }
+            
+            // Backspace 키 - 상위 디렉토리로 이동 (단, 입력 필드가 아닐 때)
+            if (e.key === 'Backspace' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                if (!document.querySelector('.modal[style*="display: block"]')) {
+                    console.log("Backspace 키 입력: 상위 디렉토리로 이동");
+                    DirectoryManager.navigateUp();
+                    e.preventDefault(); // 브라우저의 뒤로 가기 방지
+                }
+            }
+        });
+    }
+
+    //=================================================================
+    // UI 조작 함수
+    //=================================================================
+    
+    // 현재 경로 탐색 UI를 업데이트하는 함수
+    function updatePathNavigation() {
+        // 경로 네비게이션 컨테이너가 존재하지 않으면 생성
+        let pathNav = document.getElementById('pathNavigation');
+        if (!pathNav) {
+            const container = document.querySelector('.container');
+            if (!container) return;
+            
+            // 경로 네비게이션 컨테이너 생성
+            pathNav = document.createElement('div');
+            pathNav.id = 'pathNavigation';
+            pathNav.className = 'path-navigation';
+            
+            // 안내 텍스트 추가
+            const pathText = document.createElement('div');
+            pathText.className = 'path-text';
+            pathText.innerHTML = '<i class="fas fa-folder-open"></i> 현재 위치: ';
+            pathNav.appendChild(pathText);
+            
+            // 경로 표시 컨테이너 추가
+            const pathLinks = document.createElement('div');
+            pathLinks.id = 'pathLinks';
+            pathLinks.className = 'path-links';
+            pathNav.appendChild(pathLinks);
+            
+            // 컨테이너에 삽입 (트리 요소 이전)
+            const treeElement = document.getElementById('tree');
+            if (treeElement) {
+                container.insertBefore(pathNav, treeElement);
+            } else {
+                container.appendChild(pathNav);
+            }
+        }
+        
+        // 경로 링크 업데이트
+        const pathLinks = document.getElementById('pathLinks');
+        if (!pathLinks) return;
+        
+        // 링크 초기화
+        pathLinks.innerHTML = '';
+        
+        // 루트 링크 추가
+        const rootLink = document.createElement('span');
+        rootLink.className = 'path-item';
+        rootLink.textContent = '루트';
+        rootLink.addEventListener('click', function() {
+            DirectoryManager.navigateToDirectory(null);
+        });
+        pathLinks.appendChild(rootLink);
+        
+        // 현재 경로 렌더링
+        if (currentPath.length > 0) {
+            currentPath.forEach((item, index) => {
+                // 구분자 추가
+                const separator = document.createElement('span');
+                separator.className = 'path-separator';
+                separator.textContent = ' > ';
+                pathLinks.appendChild(separator);
+                
+                // 경로 항목 추가
+                const pathItem = document.createElement('span');
+                pathItem.className = 'path-item';
+                pathItem.textContent = item.name;
+                
+                // 마지막 항목이 아니면 클릭 가능하게 설정
+                if (index < currentPath.length - 1) {
+                    pathItem.addEventListener('click', function() {
+                        DirectoryManager.navigateToDirectory(item.id, currentPath.slice(0, index + 1));
+                    });
+                } else {
+                    pathItem.classList.add('current');
+                }
+                
+                pathLinks.appendChild(pathItem);
+            });
+        }
+    }
+
+    // 디렉토리로 이동하는 함수
+    function navigateToDirectory(directoryId, path = null) {
+        console.log(`디렉토리 이동: ID ${directoryId}`);
+        
+        // 현재 부모 ID 업데이트
+        currentParentId = directoryId;
+        
+        // 경로 업데이트 (있는 경우)
+        if (path) {
+            currentPath = path;
+        } else if (directoryId) {
+            // directoryId에 해당하는 디렉토리 가져오기
+            const dir = getDirectoryById(directoryId);
+            if (dir && dir.path) {
+                currentPath = dir.path;
+            } else {
+                currentPath = [];
+            }
+        } else {
+            // 루트로 이동
+            currentPath = [];
+        }
+        
+        // 경로 표시 업데이트
+        updatePathNavigation();
+        
+        // 현재 디렉토리의 내용 표시 (목록 뷰 or 디테일 뷰)
+        displayDirectoryContents(directoryId);
+    }
+
+    // 디렉토리 더블클릭 처리 (디렉토리 이동)
+    function handleDirectoryDoubleClick(nodeId) {
+        console.log(`디렉토리 더블클릭: ID ${nodeId}`);
+        
+        // 해당 디렉토리가 유효한지 확인
+        if (!isValidDirectoryId(nodeId)) {
+            console.error(`유효하지 않은 디렉토리 ID: ${nodeId}`);
+            return;
+        }
+        
+        // 디렉토리 이동
+        navigateToDirectory(nodeId);
+    }
+
+    // 상위 디렉토리로 이동하는 함수
+    function navigateUp() {
+        console.log("상위 디렉토리로 이동 시도");
+        
+        // 현재 경로가 없거나 루트 수준인 경우
+        if (!currentPath || currentPath.length === 0) {
+            console.log("이미 루트 수준입니다. 상위 디렉토리 없음.");
+            return;
+        }
+        
+        // 현재 경로에서 하나 위 경로로 이동
+        const newPath = currentPath.slice(0, -1);
+        
+        // 이동할 상위 디렉토리의 ID 결정
+        const parentId = newPath.length > 0 ? newPath[newPath.length - 1].id : null;
+        
+        // 해당 디렉토리로 이동
+        navigateToDirectory(parentId, newPath);
+    }
+
+    // 노드 토글 (확장/축소)
+    function toggleNode(id) {
+        console.log(`노드 토글: ID ${id}`);
+        const nodeElement = document.querySelector(`.tree-node[data-id="${id}"]`);
+        if (!nodeElement) return;
+        
+        const childrenElement = nodeElement.querySelector('.tree-children');
+        if (!childrenElement) return;
+        
+        const isExpanded = childrenElement.style.display !== 'none';
+        const icon = nodeElement.querySelector('.icon');
+        
+        if (isExpanded) {
+            // 축소
+            childrenElement.style.display = 'none';
+            if (icon) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-right');
+            }
+            expandedState[id] = false;
+        } else {
+            // 확장
+            childrenElement.style.display = 'block';
+            if (icon) {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-down');
+            }
+            expandedState[id] = true;
+        }
+    }
+
+    // 디렉토리 내용 표시 함수
+    function displayDirectoryContents(directoryId) {
+        console.log(`디렉토리 내용 표시: ID ${directoryId}`);
+        
+        // 디렉토리 목록 컨테이너
+        const directoryContents = document.getElementById('directoryContents');
+        if (!directoryContents) return;
+        
+        // 내용 초기화
+        directoryContents.innerHTML = '';
+        
+        // 디렉토리 ID가 없으면 루트 디렉토리 표시
+        if (!directoryId) {
+            // 루트 디렉토리 가져오기
+            const rootDirectories = Array.from(directoryIdMap.values())
+                .filter(dir => !dir.parentId)
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+            
+            // 각 루트 디렉토리 표시
+            rootDirectories.forEach(dir => {
+                const dirElement = createDirectoryElement(dir);
+                directoryContents.appendChild(dirElement);
+            });
+        } else {
+            // 특정 디렉토리의 자식 요소 표시
+            const directory = getDirectoryById(directoryId);
+            if (!directory) return;
+            
+            // 해당 디렉토리의 자식 가져오기
+            const children = Array.from(directoryIdMap.values())
+                .filter(dir => dir.parentId === directoryId)
+                .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+            
+            // 각 자식 디렉토리 표시
+            children.forEach(child => {
+                const dirElement = createDirectoryElement(child);
+                directoryContents.appendChild(dirElement);
+            });
+        }
+    }
+
+    // 디렉토리 요소 생성 함수
+    function createDirectoryElement(directory) {
+        const dirElement = document.createElement('div');
+        dirElement.className = 'directory-item';
+        dirElement.dataset.id = directory.id;
+        
+        // 아이콘 추가
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-folder';
+        dirElement.appendChild(icon);
+        
+        // 이름 추가
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'directory-name';
+        nameSpan.textContent = directory.name;
+        dirElement.appendChild(nameSpan);
+        
+        // 이벤트 리스너 추가
+        dirElement.addEventListener('dblclick', function() {
+            handleDirectoryDoubleClick(directory.id);
+        });
+        
+        // 드래그 앤 드롭 설정
+        dirElement.setAttribute('draggable', 'true');
+        
+        return dirElement;
+    }
+
+    //=================================================================
+    // 공개 API
+    //=================================================================
+    return {
+        // 데이터 관리
+        initializeDirectoryMaps: initializeDirectoryMaps,
+        processDirectoryData: processDirectoryData,
+        updateDirectoryMaps: updateDirectoryMaps,
+        getDirectoryById: getDirectoryById,
+        getDirectoryIdByPath: getDirectoryIdByPath,
+        isValidDirectoryId: isValidDirectoryId,
+        isAncestor: isAncestor,
+        loadSampleData: loadSampleData,
+        debugMaps: debugMaps,
+        
+        // 이벤트 관리
+        setupTreeEventListeners: setupTreeEventListeners,
+        setupNodeEventListeners: setupNodeEventListeners,
+        setupButtonEvents: setupButtonEvents,
+        setupKeyboardEvents: setupKeyboardEvents,
+        
+        // UI 및 네비게이션
+        updatePathNavigation: updatePathNavigation,
+        navigateToDirectory: navigateToDirectory,
+        navigateUp: navigateUp,
+        toggleNode: toggleNode,
+        displayDirectoryContents: displayDirectoryContents,
+        handleDirectoryDoubleClick: handleDirectoryDoubleClick,
+        
+        // 디렉토리 관리
+        showAddModal: showAddModal,
+        showAddRootModal: showAddRootModal,
+        closeModal: closeModal,
+        addNewDirectory: addNewDirectory,
+        addNewRootDirectory: addNewRootDirectory,
+        deleteDirectory: deleteDirectory,
+        refreshUI: refreshUI,
+        showNotification: showNotification,
+        showMapStatus: showMapStatus,
+        resetAndRefresh: resetAndRefresh,
+        moveDirectory: moveDirectory,
+        setupDragAndDrop: setupDragAndDrop,
+        
+        // 데이터 접근
+        getData: function() { return directoryData; },
+        getIdMap: function() { return directoryIdMap; },
+        getPathMap: function() { return directoryPathMap; },
+        getCurrentPath: function() { return currentPath; },
+        setCurrentPath: function(path) { currentPath = path; },
+        renderInitialTree: renderInitialTree,
+        renderTree: renderTree,
+        updateChildrenPaths: updateChildrenPaths
+    };
+})();
+
+// 페이지 로드 시 초기화
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("페이지 로드됨 - 디렉토리 관리자 초기화");
+    
+    // 샘플 데이터 로드
+    DirectoryManager.loadSampleData();
+    
+    // 경로 네비게이션 초기화
+    DirectoryManager.updatePathNavigation();
+    
+    // 초기 트리 렌더링
+    const treeElement = document.getElementById('tree');
+    if (treeElement) {
+        DirectoryManager.renderInitialTree();
+    }
+    
+    // 이벤트 설정
+    DirectoryManager.setupButtonEvents();
+    DirectoryManager.setupKeyboardEvents();
+    DirectoryManager.setupTreeEventListeners();
+    
+    // 드래그 앤 드롭 설정
+    DirectoryManager.setupDragAndDrop();
+});
+
+// 드래그 앤 드롭 기능 설정
+function setupDragAndDrop() {
+    console.log("드래그 앤 드롭 기능 설정");
+    
+    let draggedElement = null;
+    
+    // 트리 컨테이너에 이벤트 리스너 추가
+    const treeContainer = document.getElementById('tree');
+    if (!treeContainer) return;
+    
+    // 드래그 시작
+    treeContainer.addEventListener('dragstart', function(e) {
+        if (e.target.classList.contains('tree-node')) {
+            draggedElement = e.target;
+            e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            e.target.classList.add('dragging');
+            
+            // 반투명하게 표시
+            setTimeout(() => {
+                e.target.style.opacity = '0.4';
+            }, 0);
+        }
+    });
+    
+    // 드래그 종료
+    treeContainer.addEventListener('dragend', function(e) {
+        if (e.target.classList.contains('tree-node')) {
+            e.target.classList.remove('dragging');
+            e.target.style.opacity = '1';
+            
+            // 모든 드랍 대상 강조 제거
+            document.querySelectorAll('.drop-target').forEach(el => {
+                el.classList.remove('drop-target');
+            });
+        }
+    });
+    
+    // 드래그 오버 (드랍 가능 영역 표시)
+    treeContainer.addEventListener('dragover', function(e) {
+        e.preventDefault(); // 드랍을 허용하기 위해 필요
+        
+        // 드래그된 요소를 드랍할 대상 찾기
+        const dropTarget = getDropTarget(e.target);
+        
+        if (dropTarget && draggedElement && dropTarget !== draggedElement) {
+            // 드랍 대상의 ID
+            const dropTargetId = dropTarget.dataset.id;
+            // 드래그 중인 요소의 ID
+            const draggedId = draggedElement.dataset.id;
+            
+            // 상위-하위 관계 체크 (순환 참조 방지)
+            if (DirectoryManager.isAncestor(draggedId, dropTargetId)) {
+                // 드래그 중인 요소가 대상의 상위라면 드랍 불가
+                return;
+            }
+            
+            // 기존 대상 강조 제거
+            document.querySelectorAll('.drop-target').forEach(el => {
+                if (el !== dropTarget) {
+                    el.classList.remove('drop-target');
+                }
+            });
+            
+            // 새 대상 강조
+            dropTarget.classList.add('drop-target');
+        }
+    });
+    
+    // 드랍 영역 떠날 때
+    treeContainer.addEventListener('dragleave', function(e) {
+        const dropTarget = getDropTarget(e.target);
+        if (dropTarget && !dropTarget.contains(e.relatedTarget)) {
+            dropTarget.classList.remove('drop-target');
+        }
+    });
+    
+    // 드랍 실행
+    treeContainer.addEventListener('drop', function(e) {
+        e.preventDefault();
+        
+        // 드랍 대상 찾기
+        const dropTarget = getDropTarget(e.target);
+        
+        if (dropTarget && draggedElement) {
+            // 이동할 디렉토리 ID와 대상 디렉토리 ID
+            const directoryToMoveId = draggedElement.dataset.id;
+            const targetDirectoryId = dropTarget.dataset.id;
+            
+            // 동일한 요소면 무시
+            if (directoryToMoveId === targetDirectoryId) {
+                dropTarget.classList.remove('drop-target');
+                return;
+            }
+            
+            // 상위-하위 관계 체크 (순환 참조 방지)
+            if (DirectoryManager.isAncestor(directoryToMoveId, targetDirectoryId)) {
+                alert('상위 디렉토리를 하위 디렉토리로 이동할 수 없습니다.');
+                dropTarget.classList.remove('drop-target');
+                return;
+            }
+            
+            // 디렉토리 이동 실행
+            DirectoryManager.moveDirectory(directoryToMoveId, targetDirectoryId);
+            
+            // 강조 제거
+            dropTarget.classList.remove('drop-target');
+        }
+    });
+    
+    // 드랍 대상 요소 찾기 (가장 가까운 tree-node)
+    function getDropTarget(element) {
+        while (element && !element.classList.contains('tree-node')) {
+            element = element.parentElement;
+            if (!element || element === treeContainer) {
+                return null;
+            }
+        }
+        return element;
+    }
+}
+
+// 트리 초기 렌더링 함수
+function renderInitialTree() {
+    console.log("초기 트리 렌더링");
+    const treeElement = document.getElementById('tree');
+    if (!treeElement) return;
+    
+    treeElement.innerHTML = '';
+    
+    // 맵 데이터에서 루트 디렉토리 가져오기
+    const rootDirectories = Array.from(directoryIdMap.values())
+        .filter(dir => !dir.parentId)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    
+    console.log(`루트 디렉토리 ${rootDirectories.length}개를 맵에서 가져왔습니다.`);
+    
+    // 트리 렌더링 함수 호출
+    renderTree(rootDirectories, treeElement, null);
+}
+
+// 트리 렌더링 함수 (재귀적)
+function renderTree(nodes, parent, parentId) {
+    nodes.forEach(node => {
+        // 노드 요소 생성
+        const nodeElement = document.createElement('div');
+        nodeElement.className = 'tree-node';
+        nodeElement.dataset.id = node.id;
+        nodeElement.dataset.name = node.name;
+        nodeElement.dataset.parentId = parentId || '';
+        
+        // 아이콘과 이름 추가
+        const hasChildren = node.children && node.children.length > 0;
+        const iconClass = hasChildren ? 'fa-chevron-right' : 'fa-minus';
+        
+        nodeElement.innerHTML = `
+            <i class="icon fas ${iconClass}"></i>
+            <i class="fas fa-folder"></i>
+            <span class="node-text">${node.name}</span>
+            <div class="node-actions">
+                <button class="add-dir-btn"><i class="fas fa-plus"></i></button>
+                <button class="delete-btn"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+        
+        // 하위 항목 컨테이너 추가
+        if (hasChildren) {
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'tree-children';
+            childrenContainer.style.display = 'none'; // 기본 상태는 접혀 있음
+            nodeElement.appendChild(childrenContainer);
+            
+            // 재귀적으로 자식 요소 렌더링
+            renderTree(node.children, childrenContainer, node.id);
+        }
+        
+        // 부모 요소에 추가
+        parent.appendChild(nodeElement);
+        
+        // 노드 이벤트 리스너 설정
+        DirectoryManager.setupNodeEventListeners(nodeElement);
+    });
+}
+
+// 새 디렉토리 추가
+function addNewDirectory() {
+    // 필요한 값 가져오기
+    const parentId = document.getElementById('parentDirectoryId').value;
+    const newDirName = document.getElementById('newDirectoryName').value.trim();
+    
+    // 유효성 검사
+    if (!newDirName) {
+        DirectoryManager.showNotification('디렉토리 이름을 입력해주세요.', 'error');
+        return;
+    }
+    
+    // 부모 디렉토리가 유효한지 확인
+    if (!DirectoryManager.isValidDirectoryId(parentId)) {
+        DirectoryManager.showNotification('유효하지 않은 부모 디렉토리입니다.', 'error');
+        return;
+    }
+    
+    // 새 디렉토리 ID 생성 (임시 방식)
+    const newId = Date.now().toString();
+    
+    // 부모 디렉토리 가져오기
+    const parentDir = DirectoryManager.getDirectoryById(parentId);
+    
+    // 경로 계산
+    const newPath = parentDir ? [...(parentDir.path || []), { id: newId, name: newDirName }] : [{ id: newId, name: newDirName }];
+    
+    // 새 디렉토리 객체 생성
+    const newDir = {
+        id: newId,
+        name: newDirName,
+        parentId: parentId,
+        path: newPath,
+        children: []
+    };
+    
+    // 부모 디렉토리의 children 배열에 추가
+    if (parentDir && Array.isArray(parentDir.children)) {
+        parentDir.children.push(newDir);
+    }
+    
+    // 데이터 저장소에 추가
+    directoryData[newId] = newDir;
+    
+    // 맵에 추가
+    DirectoryManager.updateDirectoryMaps(newDir);
+    
+    // 모달 닫기
+    DirectoryManager.closeModal('addDirectoryModal');
+    
+    // UI 갱신
+    DirectoryManager.refreshUI();
+    
+    // 성공 메시지 표시
+    DirectoryManager.showNotification(`'${newDirName}' 디렉토리가 추가되었습니다.`, 'success');
+}
+
+// 새 루트 디렉토리 추가
+function showAddRootModal() {
+    console.log("새 루트 디렉토리 추가 모달 표시");
+    
+    // 입력 필드 초기화
+    document.getElementById('newRootDirectoryName').value = '';
+    
+    // 모달 표시
+    const modal = document.getElementById('addRootDirectoryModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// 새 루트 디렉토리 추가
+function addNewRootDirectory() {
+    // 이름 가져오기
+    const newDirName = document.getElementById('newRootDirectoryName').value.trim();
+    
+    // 유효성 검사
+    if (!newDirName) {
+        DirectoryManager.showNotification('디렉토리 이름을 입력해주세요.', 'error');
+        return;
+    }
+    
+    // 새 디렉토리 ID 생성
+    const newId = Date.now().toString();
+    
+    // 새 루트 디렉토리 객체 생성
+    const newDir = {
+        id: newId,
+        name: newDirName,
+        parentId: null,
+        path: [{ id: newId, name: newDirName }],
+        children: []
+    };
+    
+    // 데이터 저장소에 추가
+    directoryData[newId] = newDir;
+    
+    // 맵에 추가
+    DirectoryManager.updateDirectoryMaps(newDir);
+    
+    // 모달 닫기
+    DirectoryManager.closeModal('addRootDirectoryModal');
+    
+    // UI 갱신
+    DirectoryManager.refreshUI();
+    
+    // 성공 메시지 표시
+    DirectoryManager.showNotification(`'${newDirName}' 루트 디렉토리가 추가되었습니다.`, 'success');
+}
+
+// 디렉토리 삭제
+function deleteDirectory(id) {
+    // 유효성 검사
+    if (!DirectoryManager.isValidDirectoryId(id)) {
+        DirectoryManager.showNotification('유효하지 않은 디렉토리 ID입니다.', 'error');
+        return;
+    }
+    
+    // 삭제할 디렉토리 정보 가져오기
+    const directory = DirectoryManager.getDirectoryById(id);
+    if (!directory) {
+        DirectoryManager.showNotification('디렉토리를 찾을 수 없습니다.', 'error');
+        return;
+    }
+    
+    // 확인 메시지
+    if (!confirm(`'${directory.name}' 디렉토리를 삭제하시겠습니까?\n(하위 디렉토리도 모두 삭제됩니다)`)) {
+        return;
+    }
+    
+    // 부모 디렉토리에서 자식 목록 업데이트
+    if (directory.parentId) {
+        const parentDir = DirectoryManager.getDirectoryById(directory.parentId);
+        if (parentDir && parentDir.children) {
+            // 부모의 children 배열에서 이 디렉토리 제거
+            parentDir.children = parentDir.children.filter(child => child.id !== id);
+        }
+    }
+    
+    // 디렉토리와 모든 하위 디렉토리를 찾아 ID 수집
+    const idsToDelete = [];
+    
+    // 재귀적으로 하위 디렉토리 ID 수집
+    function collectIdsToDelete(dirId) {
+        idsToDelete.push(dirId);
+        
+        // 하위 디렉토리 찾기
+        const children = Array.from(DirectoryManager.getIdMap().values())
+            .filter(dir => dir.parentId === dirId);
+        
+        // 각 하위 디렉토리에 대해 재귀 호출
+        children.forEach(child => {
+            collectIdsToDelete(child.id);
+        });
+    }
+    
+    // 시작 디렉토리부터 모든 하위 디렉토리 수집
+    collectIdsToDelete(id);
+    
+    // 수집한 모든 ID를 맵과 데이터 객체에서 삭제
+    idsToDelete.forEach(dirId => {
+        // ID 맵에서 삭제
+        DirectoryManager.getIdMap().delete(dirId);
+        
+        // 데이터 객체에서 삭제
+        delete directoryData[dirId];
+        
+        // 삭제된 디렉토리와 관련된 경로 맵 항목도 삭제
+        DirectoryManager.getPathMap().forEach((value, key) => {
+            if (value === dirId) {
+                DirectoryManager.getPathMap().delete(key);
+            }
+        });
+    });
+    
+    // UI 갱신
+    DirectoryManager.refreshUI();
+    
+    // 성공 메시지 표시
+    DirectoryManager.showNotification(`'${directory.name}' 디렉토리가 삭제되었습니다.`, 'success');
+}
+
+// UI 새로고침
+function refreshUI() {
+    console.log("UI 새로고침");
+    
+    // 현재 경로 네비게이션 업데이트
+    DirectoryManager.updatePathNavigation();
+    
+    // 트리 다시 렌더링
+    const treeElement = document.getElementById('tree');
+    if (treeElement) {
+        treeElement.innerHTML = '';
+        
+        // 루트 디렉토리 가져오기
+        const rootDirectories = Array.from(DirectoryManager.getIdMap().values())
+            .filter(dir => !dir.parentId)
+            .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        
+        // 트리 렌더링
+        renderTree(rootDirectories, treeElement, null);
+        
+        // 이벤트 리스너 다시 설정
+        DirectoryManager.setupTreeEventListeners();
+    }
+    
+    // 현재 디렉토리 내용 업데이트
+    if (DirectoryManager.getCurrentPath().length > 0) {
+        DirectoryManager.displayDirectoryContents(DirectoryManager.getCurrentPath()[DirectoryManager.getCurrentPath().length - 1].id);
+    }
+}
+
+// 알림 표시
+function showNotification(message, type = 'info') {
+    console.log(`알림: ${message} (${type})`);
+    
+    // 기존 알림 요소 가져오기 또는 새로 생성
+    let notification = document.getElementById('notification');
+    
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        document.body.appendChild(notification);
+    }
+    
+    // 알림 타입에 따른 스타일
+    const typeClasses = {
+        'info': 'notification-info',
+        'success': 'notification-success',
+        'error': 'notification-error',
+        'warning': 'notification-warning'
+    };
+    
+    // 모든 타입 클래스 제거
+    Object.values(typeClasses).forEach(cls => {
+        notification.classList.remove(cls);
+    });
+    
+    // 현재 타입 클래스 추가
+    notification.classList.add('notification', typeClasses[type] || 'notification-info');
+    
+    // 메시지 설정
+    notification.textContent = message;
+    
+    // 알림 표시
+    notification.style.display = 'block';
+    
+    // 위치 조정
+    notification.style.top = '20px';
+    
+    // 일정 시간 후 숨기기
+    setTimeout(() => {
+        notification.style.top = '-100px';
+        setTimeout(() => {
+            notification.style.display = 'none';
+        }, 500);
+    }, 3000);
+}
+
+// 맵 상태 표시
+function showMapStatus() {
+    DirectoryManager.debugMaps();
+    DirectoryManager.showNotification(`맵 상태: ${DirectoryManager.getIdMap().size}개 항목, 경로 맵: ${DirectoryManager.getPathMap().size}개 항목`, 'info');
+}
+
+// 맵 초기화 및 새로고침
+function resetAndRefresh() {
+    if (confirm('모든 디렉토리 데이터를 초기화하고 샘플 데이터를 다시 로드하시겠습니까?')) {
+        DirectoryManager.initializeDirectoryMaps();
+        DirectoryManager.loadSampleData();
+        DirectoryManager.refreshUI();
+        DirectoryManager.showNotification('디렉토리 맵이 초기화되었습니다.', 'success');
+    }
+}
+
+// showAddModal 함수를 모듈 내부로 이동
+function showAddModal(parentId, parentName) {
+    console.log(`새 디렉토리 추가 모달 표시: 부모 ID ${parentId}`);
+    
+    // 부모 ID 설정
+    document.getElementById('parentDirectoryId').value = parentId;
+    
+    // 부모 이름 표시
+    const parentDirName = document.getElementById('parentDirectoryName');
+    if (parentDirName) {
+        parentDirName.textContent = parentName || '알 수 없는 부모 디렉토리';
+    }
+    
+    // 입력 필드 초기화
+    document.getElementById('newDirectoryName').value = '';
+    
+    // 모달 표시
+    const modal = document.getElementById('addDirectoryModal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// closeModal 함수를 모듈 내부로 이동
+function closeModal(modalId) {
+    console.log(`모달 닫기: ${modalId}`);
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// 디렉토리 이동 함수
+function moveDirectory(directoryId, newParentId) {
+    console.log(`디렉토리 이동: ID ${directoryId}를 부모 ID ${newParentId}로 이동`);
+    
+    // 유효성 검증
+    if (!isValidDirectoryId(directoryId) || !isValidDirectoryId(newParentId)) {
+        showNotification('유효하지 않은 디렉토리 ID입니다.', 'error');
+        return;
+    }
+    
+    // 데이터 가져오기
+    const directoryToMove = getDirectoryById(directoryId);
+    const newParentDir = getDirectoryById(newParentId);
+    
+    if (!directoryToMove || !newParentDir) {
+        showNotification('디렉토리를 찾을 수 없습니다.', 'error');
+        return;
+    }
+    
+    // 기존 부모에서 이 디렉토리 제거
+    if (directoryToMove.parentId) {
+        const oldParentDir = getDirectoryById(directoryToMove.parentId);
+        if (oldParentDir && oldParentDir.children) {
+            oldParentDir.children = oldParentDir.children.filter(child => child.id !== directoryId);
+        }
+    }
+    
+    // 새 부모 정보 업데이트
+    directoryToMove.parentId = newParentId;
+    
+    // 경로 정보 업데이트
+    const newPath = [...newParentDir.path, { id: directoryToMove.id, name: directoryToMove.name }];
+    directoryToMove.path = newPath;
+    
+    // 모든 하위 디렉토리의 경로도 업데이트
+    updateChildrenPaths(directoryToMove);
+    
+    // 새 부모의 children 배열에 추가
+    if (!newParentDir.children) {
+        newParentDir.children = [];
+    }
+    newParentDir.children.push(directoryToMove);
+    
+    // 맵 업데이트
+    updateDirectoryMaps(directoryToMove);
+    
+    // UI 갱신
+    refreshUI();
+    
+    // 알림 표시
+    showNotification(`'${directoryToMove.name}' 디렉토리를 '${newParentDir.name}'로 이동했습니다.`, 'success');
+}
+
+// 하위 디렉토리의 경로 재귀적 업데이트
+function updateChildrenPaths(directory) {
+    // directoryIdMap에서 이 디렉토리의 모든 하위 디렉토리 찾기
+    const children = Array.from(directoryIdMap.values())
+        .filter(dir => dir.parentId === directory.id);
+    
+    children.forEach(child => {
+        // 경로 업데이트
+        child.path = [...directory.path, { id: child.id, name: child.name }];
+        
+        // 맵 업데이트
+        updateDirectoryMaps(child);
+        
+        // 재귀적으로 하위 디렉토리도 처리
+        updateChildrenPaths(child);
+    });
+}
+
+
+

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropAnd - 로그인</title>
+    <link href="css_html5/font-awesome.min.css" rel="stylesheet">
+    <script src="js_html5/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { background-color: white; padding: 30px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-group label { display: block; margin-bottom: 5px; }
+        .input-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 3px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; background-color: #4caf50; color: white; width: 100%; }
+        .btn:hover { background-color: #45a049; }
+        .error-message { color: red; margin-top: 10px; display: none; }
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .toast { background-color: #333; color: white; padding: 10px 20px; border-radius: 3px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; min-width: 200px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); animation: fadeInOut 3s forwards; }
+        .toast-close { background: none; border: none; color: white; cursor: pointer; font-size: 16px; margin-left: 10px; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(100px); } 10% { opacity: 1; transform: translateX(0); } 90% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(100px); } }
+    </style>
+    <script type="module" src="js_html5/login.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>DropAnd 로그인</h2>
+        <form id="loginForm">
+            <div class="input-group">
+                <label for="username">사용자명</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">로그인</button>
+            <div class="error-message" id="errorMessage">로그인에 실패했습니다. 사용자명 또는 비밀번호를 확인하세요.</div>
+        </form>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script type="module">
+        async function loadHTML(url, targetId) {
+            try {
+                const response = await fetch(url);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const scriptContent = doc.querySelector('script').textContent;
+                if (targetId) {
+                    document.getElementById(targetId).innerHTML += doc.body.innerHTML;
+                }
+            } catch (error) {
+                console.error('HTML 파일을 불러오는 데 실패했습니다:', error);
+            }
+        }
+
+        // 필요한 HTML 파일들을 불러옴
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadHTML('../js_html5/notification.html', null);
+        });
+
+        $(document).ready(function() {
+            $('#loginForm').on('submit', function(e) {
+                e.preventDefault();
+                var username = $('#username').val();
+                var password = $('#password').val();
+
+                $.ajax({
+                    url: '/login',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ username: username, password: password }),
+                    success: function(response) {
+                        if (response === 'success') {
+                            window.location.href = 'list.html';
+                        } else {
+                            $('#errorMessage').show();
+                            showToast('로그인에 실패했습니다. 사용자명 또는 비밀번호를 확인하세요.');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        $('#errorMessage').show();
+                        showToast('로그인에 실패했습니다. 사용자명 또는 비밀번호를 확인하세요.');
+                        console.error(error);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

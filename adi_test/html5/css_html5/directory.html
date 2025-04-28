@@ -1,0 +1,56 @@
+<!--
+  기존 directory.css의 스타일을 HTML5 <style>로 변환하여 포함한 예시입니다.
+  - 별도의 .css 파일 없이, HTML 내부 <style>로만 스타일 적용
+  - HTML5 시맨틱 구조와 조합
+-->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>directory.css를 HTML5로 변환</title>
+  <style>
+    .directory-wrapper { margin-left: 20px; }
+    .directory-wrapper:first-child { margin-left: 0; }
+    .directory-item { display: flex; align-items: center; padding: 5px; margin: 2px 0; cursor: pointer; border: 1px solid transparent; border-radius: 4px; }
+    .directory-item:hover { background-color: #f8f9fa; border-color: #dee2e6; }
+    .directory-toggle { margin-right: 5px; cursor: pointer; visibility: hidden; }
+    .has-children > .directory-toggle { visibility: visible; }
+    .directory-name { margin-left: 5px; flex-grow: 1; -webkit-user-select: none; user-select: none; }
+    .directory-actions { visibility: hidden; margin-left: auto; }
+    .directory-item:hover .directory-actions { visibility: visible; }
+    .directory-children { display: none; margin-left: 20px; }
+    .directory-children.expanded { display: block; }
+    .directory-item.dragging { opacity: 0.5; }
+    .directory-item.drag-over { border: 2px dashed #0d6efd; background-color: #e9ecef; }
+    .directory-item .btn { padding: 0.25rem 0.5rem; font-size: 0.875rem; margin-left: 5px; }
+    .directory-item .btn-icon { padding: 0; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; }
+    .directory-item .btn-icon:hover { background-color: rgba(13, 110, 253, 0.1); }
+    .directory-item .btn-icon i { font-size: 14px; }
+    .directory-item.drag-over-top { border-top: 2px solid #0d6efd; }
+    .directory-item.drag-over-bottom { border-bottom: 2px solid #0d6efd; }
+  </style>
+</head>
+<body>
+  <h2>directory.css의 스타일이 HTML5 <style>로 변환됨</h2>
+  <div class="directory-wrapper">
+    <div class="directory-item">
+      <span class="directory-toggle">▶</span>
+      <span class="directory-name">폴더1</span>
+      <div class="directory-actions">
+        <button class="btn btn-icon">✎</button>
+        <button class="btn btn-icon">🗑</button>
+      </div>
+    </div>
+    <div class="directory-children expanded">
+      <div class="directory-item">
+        <span class="directory-toggle"></span>
+        <span class="directory-name">서브폴더1</span>
+        <div class="directory-actions">
+          <button class="btn btn-icon">✎</button>
+          <button class="btn btn-icon">🗑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

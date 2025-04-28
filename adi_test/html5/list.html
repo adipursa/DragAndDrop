@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropAnd - 디렉토리 목록</title>
+    <link href="css_html5/font-awesome.min.css" rel="stylesheet">
+    <script src="js_html5/jquery-3.6.0.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .directory-list { margin-top: 20px; }
+        .directory-item { padding: 10px; margin: 5px 0; display: flex; align-items: center; border-bottom: 1px solid #eee; }
+        .directory-name { margin-left: 10px; flex-grow: 1; }
+        .btn { padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 12px; }
+        .btn-add { background-color: #4caf50; color: white; }
+        .btn-delete { background-color: #f44336; color: white; }
+        .top-actions { margin-bottom: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 5px; display: flex; align-items: center; gap: 10px; }
+        .icon-folder { color: #ffd700; margin-right: 5px; }
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 1000; }
+        .toast { background-color: #333; color: white; padding: 10px 20px; border-radius: 3px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; min-width: 200px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); animation: fadeInOut 3s forwards; }
+        .toast-close { background: none; border: none; color: white; cursor: pointer; font-size: 16px; margin-left: 10px; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateX(100px); } 10% { opacity: 1; transform: translateX(0); } 90% { opacity: 1; transform: translateX(0); } 100% { opacity: 0; transform: translateX(100px); } }
+    </style>
+    <script type="module" src="js_html5/list.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>DropAnd - 디렉토리 목록</h1>
+        <div class="top-actions">
+            <button class="btn btn-add" onclick="addDirectory()">새 디렉토리 추가</button>
+            <a href="index.html" class="btn">트리 보기</a>
+        </div>
+        <div class="directory-list" id="directoryList"></div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+</body>
+</html>

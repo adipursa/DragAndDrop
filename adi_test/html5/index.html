@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropAnd - 디렉토리 관리</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="js_html5/jquery-3.6.0.min.js"></script>
+    <script src="js_html5/jquery-ui.min.js"></script>
+    
+    <!-- 통합된 디렉토리 관리 모듈 -->
+    <script src="js_html5/directoryManager-01-core.js"></script>
+    <script src="js_html5/directoryManager-02-ui.js"></script>
+    <script src="js_html5/directoryManager-03-navigation.js"></script>
+    <script src="js_html5/directoryManager-04-operations.js"></script>
+    <script src="js_html5/directoryManager-05-init.js"></script>
+    
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 3px; cursor: pointer; font-size: 14px; background-color: #4caf50; color: white; }
+        .btn:hover { background-color: #45a049; }
+        
+        /* 트리 스타일 개선 */
+        .tree { margin-top: 20px; }
+        .tree-node { 
+            padding: 8px 5px; 
+            cursor: pointer; 
+            user-select: none; 
+            -webkit-user-select: none; 
+            position: relative;
+            border-radius: 3px;
+            margin-bottom: 2px;
+        }
+        .tree-node:hover { 
+            background-color: #f0f0f0; 
+        }
+        .tree-node.dragging { 
+            opacity: 0.5; 
+            background-color: #e0e0e0; 
+            border: 1px dashed #999;
+        }
+        .tree-node.drop-target { 
+            background-color: #e3f2fd; 
+            border: 2px dashed #2196F3;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.4); }
+            70% { box-shadow: 0 0 0 5px rgba(33, 150, 243, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+        }
+        .tree-node.dragging .delete-btn,
+        .tree-node.dragging .add-dir-btn {
+            display: none;
+        }
+        .tree-node.drop-target .delete-btn,
+        .tree-node.drop-target .add-dir-btn {
+            display: none;
+        }
+        .tree-node .icon { 
+            margin-right: 5px; 
+            width: 16px;
+            text-align: center;
+            color: #555;
+        }
+        .tree-node .fa-folder { color: #ffc107; }
+        .tree-node .fa-file { color: #2196F3; }
+        .tree-node .fa-chevron-right, .tree-node .fa-chevron-down { 
+            color: #777;
+            cursor: pointer;
+            width: 12px;
+            margin-right: 5px;
+        }
+        .tree-node .node-text {
+            margin-right: 15px; /* 텍스트와 버튼 사이 간격 추가 */
+        }
+        .tree-node .delete-btn { 
+            color: red; 
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 0.8em;
+            display: inline-block;  /* 항상 표시 */
+        }
+        
+        /* 하위 디렉토리 추가 버튼 스타일 */
+        .tree-node .add-dir-btn {
+            color: #4caf50;
+            margin-left: 10px; /* 버튼 간 간격 증가 */
+            cursor: pointer;
+            font-size: 0.8em;
+            display: inline-block;  /* 항상 표시 */
+        }
+        .tree-node .add-dir-btn .fa-plus {
+            font-size: 10px;
+            background-color: #4caf50;
+            color: white;
+            padding: 2px;
+            border-radius: 50%;
+            width: 10px;
+            height: 10px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .tree-children { 
+            margin-left: 20px; 
+            display: none;
+            border-left: 1px dashed #ccc;
+            padding-left: 5px;
+        }
+        .tree-node.expanded > .tree-children { display: block; }
+        
+        /* 경로 네비게이션 스타일 */
+        .path-navigation {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .path-text {
+            color: #555;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .path-text i {
+            color: #ffc107;
+            margin-right: 5px;
+        }
+        .path-links {
+            flex: 1;
+            white-space: nowrap;
+            overflow: auto;
+            -ms-overflow-style: none;  /* IE 및 Edge에서 스크롤바 숨기기 */
+            scrollbar-width: none;  /* Firefox에서 스크롤바 숨기기 */
+        }
+        /* Chrome, Safari, Opera에서 스크롤바 숨기기 */
+        .path-links::-webkit-scrollbar {
+            display: none;
+        }
+        .path-link {
+            color: #2196F3;
+            cursor: pointer;
+            padding: 3px 5px;
+            border-radius: 3px;
+        }
+        .path-link:hover {
+            background-color: #e3f2fd;
+            text-decoration: underline;
+        }
+        .path-link.current {
+            color: #555;
+            cursor: default;
+            font-weight: bold;
+        }
+        .path-link.current:hover {
+            background-color: transparent;
+            text-decoration: none;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 5px;
+            margin-left: 10px;
+        }
+        .nav-button {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 3px 8px;
+            color: #555;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+        .nav-button i {
+            margin-right: 4px;
+        }
+        .nav-button:hover {
+            background-color: #e3e3e3;
+        }
+        
+        /* 모달 스타일 개선 */
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 400px; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .modal-header, .modal-footer { display: flex; justify-content: space-between; align-items: center; padding: 10px; }
+        .modal-header { border-bottom: 1px solid #ddd; }
+        .modal-footer { border-top: 1px solid #ddd; justify-content: center; }
+        .modal-title { font-size: 18px; font-weight: bold; }
+        .close { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { color: black; }
+        .input-group { margin: 15px 0; }
+        .input-group label { display: block; margin-bottom: 5px; }
+        .input-group input { 
+            width: 100%; 
+            padding: 8px; 
+            border: 1px solid #ddd; 
+            border-radius: 3px; 
+            font-size: 14px;
+        }
+        .input-group input:focus {
+            border-color: #4caf50;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+        
+        /* 버튼 그룹 스타일 */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn-primary {
+            background-color: #4caf50;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #f0f0f0;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        
+        /* 알림 메시지 스타일 */
+        #toastContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 4px;
+            color: white;
+            margin-bottom: 10px;
+            max-width: 300px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
+        }
+        .toast.info {
+            background-color: #2196F3;
+        }
+        .toast.success {
+            background-color: #4caf50;
+        }
+        .toast.warning {
+            background-color: #ff9800;
+        }
+        .toast.error {
+            background-color: #f44336;
+        }
+        .toast-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+        }
+        
+        /* 애니메이션 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+        
+        /* 빈 디렉토리 메시지 */
+        .empty-dir-message {
+            color: #888;
+            font-style: italic;
+            padding: 10px;
+            text-align: center;
+            border: 1px dashed #ddd;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        
+        /* 설명 패널 */
+        .instruction-panel {
+            background-color: #f8f9fa;
+            border-left: 3px solid #4caf50;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #555;
+        }
+        .instruction-panel h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 16px;
+        }
+        .instruction-panel ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instruction-panel li {
+            margin-bottom: 5px;
+        }
+        
+        /* 액션 버튼 영역 */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .action-buttons .btn {
+            display: flex;
+            align-items: center;
+        }
+        .action-buttons .btn i {
+            margin-right: 5px;
+        }
+        
+        /* 디버그 버튼 스타일 */
+        .btn-debug {
+            background-color: #ff9800;
+        }
+        .btn-debug:hover {
+            background-color: #f57c00;
+        }
+        
+        /* 리셋 버튼 스타일 */
+        .btn-reset {
+            background-color: #e91e63;
+        }
+        .btn-reset:hover {
+            background-color: #d81b60;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DropAnd - 디렉토리 관리</h1>
+            <div class="btn-group">
+                <button id="addRootBtn" class="btn"><i class="fas fa-folder-plus"></i> 루트 디렉토리 추가</button>
+                <button id="debugMapBtn" class="btn btn-debug" title="맵 데이터 확인"><i class="fas fa-bug"></i> 디버그</button>
+                <button id="resetMapBtn" class="btn btn-reset" title="맵 데이터 초기화"><i class="fas fa-redo"></i> 초기화</button>
+            </div>
+        </div>
+        
+        <div class="instruction-panel">
+            <h3>사용 방법</h3>
+            <ul>
+                <li><strong>디렉토리 추가:</strong> '+' 버튼을 클릭하여 하위 디렉토리를 추가합니다.</li>
+                <li><strong>디렉토리 삭제:</strong> '[삭제]' 버튼을 클릭하여 디렉토리를 삭제합니다.</li>
+                <li><strong>디렉토리 이동:</strong> 드래그 앤 드롭으로 디렉토리를 다른 디렉토리로 이동합니다.</li>
+                <li><strong>디렉토리 열기:</strong> 디렉토리를 더블클릭하여 내용을 확인합니다.</li>
+                <li><strong>경로 이동:</strong> 상단의 경로를 클릭하여 해당 디렉토리로 이동합니다.</li>
+            </ul>
+        </div>
+        
+        <div class="action-buttons">
+            <button id="upDirBtn" class="btn"><i class="fas fa-arrow-up"></i> 상위 디렉토리</button>
+        </div>
+        
+        <div id="tree" class="tree"></div>
+    </div>
+    
+    <!-- 디렉토리 추가 모달 -->
+    <div id="addDirectoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">하위 디렉토리 추가</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="parentDirectoryName">부모 디렉토리:</label>
+                    <span id="parentDirectoryName"></span>
+                    <input type="hidden" id="parentDirectoryId">
+                </div>
+                <div class="input-group">
+                    <label for="newDirectoryName">새 디렉토리 이름:</label>
+                    <input type="text" id="newDirectoryName" placeholder="디렉토리 이름을 입력하세요">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="addDirectoryConfirmBtn" class="btn btn-primary">추가</button>
+                <button class="btn btn-secondary cancel-btn">취소</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 루트 디렉토리 추가 모달 -->
+    <div id="addRootDirectoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">루트 디렉토리 추가</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="newRootDirectoryName">새 디렉토리 이름:</label>
+                    <input type="text" id="newRootDirectoryName" placeholder="디렉토리 이름을 입력하세요">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="addRootDirectoryConfirmBtn" class="btn btn-primary">추가</button>
+                <button class="btn btn-secondary cancel-btn">취소</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 알림 메시지 컨테이너 -->
+    <div id="toastContainer"></div>
+</body>
+</html>
